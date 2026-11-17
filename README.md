@@ -18,11 +18,11 @@ npx prisma migrate dev --name init
 npm run dev
 ```
 
-Open `/knowledge` for provider configuration and website knowledge ingestion. Open `/workflows` to create automations, use the built-in "Trợ lý AI trả lời khách 24/7" template, and edit graphs with React Flow. Configure and enable an AI provider in `/knowledge` to use Workflow Copilot.
+Open `/knowledge` to configure the provider and ingest website knowledge. Open `/workflows` to create and activate a flow. On the home page, use the bottom-right chat bubble to test it; the API stores conversations and message history, traverses the active graph, and uses pgvector retrieval for configured AI Agent nodes.
 
-Workflow APIs validate graph node/edge types and cap graph size. AI-generated changes are shown as a proposal; they are not applied until explicitly accepted in the editor. Protect all admin APIs with authentication and authorization before public deployment.
+The chat API runs the most recently updated active workflow. Configure and enable an AI provider and use an embedding model that returns 1536 dimensions. RAG only searches active documents in the groups selected on the AI Agent node. The widget renders assistant Markdown without enabling raw HTML.
 
-The Prisma schema declares the PostgreSQL `vector` extension and stores embeddings as `vector(1536)`. Similarity search over Prisma's `Unsupported` field requires parameterized raw SQL. Do not expose AI API keys; encrypt them at rest before production use.
+Before deploying publicly, add authentication for admin APIs, plus production-grade rate limiting/abuse protection and encrypt stored AI credentials. Public chat is intended as a demo until those protections are configured.
 
 ## API routes
 
@@ -33,6 +33,7 @@ The Prisma schema declares the PostgreSQL `vector` extension and stores embeddin
 - `GET/POST /api/workflows` — list and create workflows or the 24/7 assistant template.
 - `GET/PATCH/DELETE /api/workflows/:id` — retrieve, update, activate/deactivate, and delete workflows.
 - `POST /api/workflows/copilot` — return a validated AI-proposed graph from the current graph and a Vietnamese instruction.
+- `GET/POST /api/chat` — load visitor conversation history and execute a turn through the active workflow and RAG agent.
 
 ## Scripts
 
