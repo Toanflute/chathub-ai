@@ -1,0 +1,116 @@
+generator client {
+  provider        = "prisma-client-js"
+  previewFeatures = ["postgresqlExtensions"]
+}
+
+datasource db {
+  provider   = "postgresql"
+  url        = env("DATABASE_URL")
+  extensions = [vector]
+}
+
+model AiSettings {
+  id            String   @id @default(cuid())
+  provider      String   @default("openai") // openai, deepseek, custom
+  baseUrl       String?
+  apiKey        String   // Store encrypted in production; never expose through client APIs.
+  modelName     String   @default("gpt-4o-mini")
+  embeddingModel String  @default("text-embedding-3-small")
+  isEnabled     Boolean  @default(false)
+  createdAt     DateTime @default(now())
+  updatedAt     DateTime @updatedAt
+
+  @@map("ai_settings")
+}
+
+model KnowledgeGroup {
+  id          String     @id @default(cuid())
+  name        String
+  description String?
+  createdAt   DateTime   @default(now())
+  updatedAt   DateTime   @updatedAt
+  documents   Document[]
+
+  @@unique([name])
+  @@index([createdAt])
+  @@map("knowledge_groups")
+}
+
+model Document {
+  id              String         @id @default(cuid())
+  title           String
+  sourceUrl       String?
+  sourceType      String         @default("website") // website, file, manual
+  status          String         @default("active") // active, inactive, processing, failed
+  content         String         @db.Text
+  metadata        Json?
+  knowledgeGroupId String
+  knowledgeGroup  KnowledgeGroup @relation(fields: [knowledgeGroupId], references: [id], onDelete: Cascade)
+  chunks          DocumentChunk[]
+  createdAt       DateTime       @default(now())
+  updatedAt       DateTime       @updatedAt
+
+  @@index([knowledgeGroupId])
+  @@index([status])
+  @@index([sourceUrl])
+  @@map("documents")
+}
+
+model DocumentChunk {
+  id         String   @id @default(cuid())
+  documentId String
+  document   Document @relation(fields: [documentId], references: [id], onDelete: Cascade)
+  content    String   @db.Text
+  chunkIndex Int
+  // PostgreSQL pgvector column. Prisma treats this as an unsupported native type;
+  // vector similarity queries should use parameterized $queryRaw/$executeRaw SQL.
+  embedding  Unsupported("vector(1536)")?
+  metadata   Json?
+  createdAt  DateTime @default(now())
+
+  @@unique([documentId, chunkIndex])
+  @@index([documentId])
+  @@map("document_chunks")
+}
+
+model Workflow {
+  id          String   @id @default(cuid())
+  name        String
+  description String?
+  isActive    Boolean  @default(false)
+  // React Flow node/edge graph and node configuration.
+  config      Json
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  @@index([isActive])
+  @@map("workflows")
+}
+
+model Conversation {
+  id          String    @id @default(cuid())
+  visitorId   String?
+  channel     String    @default("WEB_CHAT")
+  status      String    @default("open") // open, resolved, handed_off
+  metadata    Json?
+  messages    Message[]
+  createdAt   DateTime  @default(now())
+  updatedAt   DateTime  @updatedAt
+
+  @@index([visitorId])
+  @@index([status, updatedAt])
+  @@map("conversations")
+}
+
+model Message {
+  id             String       @id @default(cuid())
+  conversationId String
+  conversation   Conversation @relation(fields: [conversationId], references: [id], onDelete: Cascade)
+  role           String       // user, assistant, system
+  content        String       @db.Text
+  metadata       Json?
+  createdAt      DateTime     @default(now())
+
+  @@index([conversationId, createdAt])
+  @@map("messages")
+}
