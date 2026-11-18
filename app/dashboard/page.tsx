@@ -1,4 +1,5 @@
 import InboxDashboard from "@/components/inbox-dashboard";
+import SearchPalette from "@/components/search-palette";
 
 export const metadata = {
   title: "Tin nhắn | ChatHub AI",
@@ -6,5 +7,5 @@ export const metadata = {
 };
 
 export default function DashboardPage() {
-  return <InboxDashboard />;
+  return <><InboxDashboard /><SearchPalette /></>;
 }
