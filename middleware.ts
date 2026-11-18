@@ -5,7 +5,7 @@ export function middleware(request: NextRequest) {
   const { pathname } = request.nextUrl;
 
   if (pathname === "/login") {
-    if (isLoggedIn) return NextResponse.redirect(new URL("/knowledge", request.url));
+    if (isLoggedIn) return NextResponse.redirect(new URL("/dashboard", request.url));
     return NextResponse.next();
   }
 
@@ -15,9 +15,10 @@ export function middleware(request: NextRequest) {
     return NextResponse.redirect(loginUrl);
   }
 
+  if (pathname === "/") return NextResponse.redirect(new URL("/dashboard", request.url));
   return NextResponse.next();
 }
 
 export const config = {
-  matcher: ["/", "/login", "/knowledge/:path*", "/workflows/:path*"],
+  matcher: ["/", "/login", "/dashboard/:path*", "/knowledge/:path*", "/workflows/:path*"],
 };
