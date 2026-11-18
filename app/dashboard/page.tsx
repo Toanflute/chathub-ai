@@ -1,4 +1,5 @@
 import InboxDashboard from "@/components/inbox-dashboard";
+import NotificationDrawer from "@/components/notification-drawer";
 import SearchPalette from "@/components/search-palette";
 
 export const metadata = {
@@ -7,5 +8,5 @@ export const metadata = {
 };
 
 export default function DashboardPage() {
-  return <><InboxDashboard /><SearchPalette /></>;
+  return <><InboxDashboard /><SearchPalette /><NotificationDrawer /></>;
 }
