@@ -1,5 +1,6 @@
 import type { Metadata } from "next";
 import "@xyflow/react/dist/style.css";
+import MoreMenu from "@/components/more-menu";
 import "./globals.css";
 
 export const metadata: Metadata = {
@@ -10,7 +11,7 @@ export const metadata: Metadata = {
 export default function RootLayout({ children }: Readonly<{ children: React.ReactNode }>) {
   return (
     <html lang="vi">
-      <body>{children}</body>
+      <body>{children}<MoreMenu /></body>
     </html>
   );
 }
