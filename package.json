@@ -56,6 +56,7 @@
   "build": {
     "appId": "com.chathub.ai.desktop",
     "productName": "ChatHub AI",
+    "publish": null,
     "asar": false,
     "directories": {
       "output": "release"
