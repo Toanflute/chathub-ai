@@ -2,6 +2,9 @@ import { NextResponse } from "next/server";
 import OpenAI from "openai";
 import { prisma } from "@/lib/prisma";
 import { validateGraph, type WorkflowNode } from "@/lib/workflow";
+import { getAiRuntimeSettings } from "@/lib/ai-settings";
+import { getSystemSettingValue } from "@/lib/system-settings";
+import { isOutsideBusinessHours } from "@/lib/business-hours";
 
 export const runtime = "nodejs";
 export const maxDuration = 60;
@@ -149,9 +152,22 @@ export async function GET(request: Request) {
     const url = new URL(request.url);
     const visitorId = url.searchParams.get("visitorId");
     const conversationId = url.searchParams.get("conversationId");
+    const requestedChannelId = url.searchParams.get("channelConnectionId");
     if (!visitorId || visitorId.length > 100) return NextResponse.json({ error: "visitorId không hợp lệ." }, { status: 400 });
     if (!conversationId) return NextResponse.json({ conversationId: null, messages: [] });
-    const conversation = await prisma.conversation.findFirst({ where: { id: conversationId, visitorId, channel: CHAT_CHANNEL }, include: { messages: { orderBy: { createdAt: "asc" }, take: 100 } } });
+    const channelConnection = requestedChannelId
+      ? await prisma.channelConnection.findFirst({ where: { id: requestedChannelId, platform: "chat_plugin", enabled: true }, select: { id: true } })
+      : null;
+    if (requestedChannelId && !channelConnection) return NextResponse.json({ error: "Chat Plugin không hợp lệ hoặc đã tắt." }, { status: 404 });
+    const conversation = await prisma.conversation.findFirst({
+      where: {
+        id: conversationId,
+        visitorId,
+        channel: CHAT_CHANNEL,
+        ...(channelConnection ? { channelConnectionId: channelConnection.id } : {}),
+      },
+      include: { messages: { where: { role: { in: ["user", "assistant"] } }, orderBy: { createdAt: "asc" }, take: 100 } },
+    });
     if (!conversation) return NextResponse.json({ conversationId: null, messages: [] });
     return NextResponse.json({ conversationId: conversation.id, status: conversation.status, messages: conversation.messages.map(({ id, role, content, createdAt }) => ({ id, role, content, createdAt })) });
   } catch { return NextResponse.json({ error: "Không thể tải lịch sử chat." }, { status: 500 }); }
@@ -163,23 +179,70 @@ export async function POST(request: Request) {
     const visitorId = typeof body.visitorId === "string" ? body.visitorId : "";
     const userText = typeof body.message === "string" ? body.message.trim() : "";
     const requestedConversationId = typeof body.conversationId === "string" ? body.conversationId : null;
+    const requestedChannelId = typeof body.channelConnectionId === "string" ? body.channelConnectionId : null;
     if (!visitorId || visitorId.length > 100) return NextResponse.json({ error: "visitorId không hợp lệ." }, { status: 400 });
     if (!userText || userText.length > MAX_MESSAGE_LENGTH) return NextResponse.json({ error: `Tin nhắn phải có từ 1 đến ${MAX_MESSAGE_LENGTH} ký tự.` }, { status: 400 });
 
+    const channelConnection = requestedChannelId
+      ? await prisma.channelConnection.findFirst({ where: { id: requestedChannelId, platform: "chat_plugin", enabled: true } })
+      : await prisma.channelConnection.findFirst({ where: { platform: "chat_plugin", enabled: true }, orderBy: { createdAt: "asc" } });
+    if (requestedChannelId && !channelConnection) return NextResponse.json({ error: "Chat Plugin không hợp lệ hoặc đã tắt." }, { status: 404 });
     const activeWorkflow = await prisma.workflow.findFirst({ where: { isActive: true }, orderBy: { updatedAt: "desc" } });
     const graph = activeWorkflow ? validateGraph(activeWorkflow.config) : null;
-    const settings = await prisma.aiSettings.findFirst({ orderBy: { updatedAt: "desc" } });
+    const settings = await getAiRuntimeSettings();
+    const [defaultStatus, afterHoursMessage, businessHoursEnabled, businessHoursSchedule, systemTimezone] = await Promise.all([
+      getSystemSettingValue("general", "defaultConversationStatus"),
+      getSystemSettingValue("general", "afterHoursMessage"),
+      getSystemSettingValue("business-hours", "enabled"),
+      getSystemSettingValue("business-hours", "schedule"),
+      getSystemSettingValue("general", "timezone"),
+    ]);
+    const configuredAfterHoursMessage = typeof afterHoursMessage === "string" ? afterHoursMessage.trim() : "";
+    const timeZone = typeof systemTimezone === "string" && systemTimezone ? systemTimezone : "Asia/Ho_Chi_Minh";
+    const afterHours = businessHoursEnabled === true
+      && configuredAfterHoursMessage.length > 0
+      && isOutsideBusinessHours(typeof businessHoursSchedule === "string" ? businessHoursSchedule : "", timeZone);
     let conversation = requestedConversationId
-      ? await prisma.conversation.findFirst({ where: { id: requestedConversationId, visitorId, channel: CHAT_CHANNEL } })
+      ? await prisma.conversation.findFirst({
+        where: {
+          id: requestedConversationId,
+          visitorId,
+          channel: CHAT_CHANNEL,
+          ...(channelConnection ? { channelConnectionId: channelConnection.id } : {}),
+        },
+      })
       : null;
     if (requestedConversationId && !conversation) return NextResponse.json({ error: "Không tìm thấy cuộc trò chuyện." }, { status: 404 });
-    if (!conversation) conversation = await prisma.conversation.create({ data: { visitorId, channel: CHAT_CHANNEL, status: "open" } });
+    if (!conversation) {
+      conversation = await prisma.conversation.create({
+        data: {
+          visitorId,
+          channel: CHAT_CHANNEL,
+          channelConnectionId: channelConnection?.id,
+          status: defaultStatus === "Đang chờ" ? "pending" : defaultStatus === "Đã đóng" ? "closed" : "open",
+        },
+      });
+    } else if (channelConnection && !conversation.channelConnectionId) {
+      conversation = await prisma.conversation.update({
+        where: { id: conversation.id },
+        data: { channelConnectionId: channelConnection.id },
+      });
+    }
+
+    if (channelConnection && channelConnection.status !== "connected") {
+      await prisma.channelConnection.update({
+        where: { id: channelConnection.id },
+        data: { status: "connected", connectedAt: new Date(), lastError: null },
+      });
+    }
 
     const recent = await prisma.message.findMany({ where: { conversationId: conversation.id }, orderBy: { createdAt: "desc" }, take: MAX_HISTORY });
     const history: ChatMessage[] = recent.reverse().filter((message) => message.role === "user" || message.role === "assistant").map((message) => ({ role: message.role as ChatMessage["role"], content: message.content }));
     await prisma.message.create({ data: { conversationId: conversation.id, role: "user", content: userText } });
 
-    const result = graph
+    const result = afterHours
+      ? { text: configuredAfterHoursMessage, handoff: false }
+      : graph
       ? await executeWorkflow(graph, userText, history, settings)
       : { text: activeWorkflow ? "Xin lỗi, workflow đang hoạt động có sơ đồ không hợp lệ. Vui lòng liên hệ quản trị viên." : "Xin chào! Hiện chưa có workflow nào được kích hoạt. Vui lòng quay lại sau nhé.", handoff: false };
     const assistantMessage = await prisma.message.create({ data: { conversationId: conversation.id, role: "assistant", content: result.text, metadata: { handoff: result.handoff, workflowId: activeWorkflow?.id ?? null } } });

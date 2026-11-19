@@ -1,9 +1,12 @@
 node_modules/
 .next/
+.next-dev/
 .out/
 build/
 dist/
+release/
 coverage/
+data/settings.json
 .env
 .env.*
 !.env.example

@@ -1,7 +1,7 @@
 import { NextResponse } from "next/server";
 import OpenAI from "openai";
-import { prisma } from "@/lib/prisma";
 import { validateGraph } from "@/lib/workflow";
+import { getAiRuntimeSettings } from "@/lib/ai-settings";
 
 export const runtime = "nodejs";
 export const maxDuration = 45;
@@ -13,8 +13,8 @@ export async function POST(request: Request) {
     const currentGraph = validateGraph(body.graph);
     if (!instruction || instruction.length > 1500) return NextResponse.json({ error: "Yêu cầu phải có từ 1 đến 1.500 ký tự." }, { status: 400 });
     if (!currentGraph) return NextResponse.json({ error: "Sơ đồ hiện tại không hợp lệ." }, { status: 400 });
-    const settings = await prisma.aiSettings.findFirst({ orderBy: { updatedAt: "desc" } });
-    if (!settings?.isEnabled || !settings.apiKey) return NextResponse.json({ error: "Hãy bật AI và cấu hình API key trong trang Kiến thức trước." }, { status: 400 });
+    const settings = await getAiRuntimeSettings();
+    if (!settings.isEnabled || !settings.apiKey) return NextResponse.json({ error: "Hãy bật AI và cấu hình API key trong trang Cài đặt." }, { status: 400 });
     const client = new OpenAI({ apiKey: settings.apiKey, ...(settings.baseUrl ? { baseURL: settings.baseUrl } : settings.provider === "deepseek" ? { baseURL: "https://api.deepseek.com" } : {}), timeout: 35_000, maxRetries: 0 });
     const completion = await client.chat.completions.create({
       model: settings.modelName,

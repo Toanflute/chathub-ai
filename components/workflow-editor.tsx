@@ -4,6 +4,7 @@ import { FormEvent, useCallback, useEffect, useMemo, useState } from "react";
 import { addEdge, Background, Controls, MiniMap, ReactFlow, ReactFlowProvider, useEdgesState, useNodesState, type Connection, type Edge, type Node } from "@xyflow/react";
 import { ArrowLeft, Bot, Check, LoaderCircle, MessageSquare, GitBranch, Play, Plus, Save, Send, UserRound, X } from "lucide-react";
 import { workflowNodeTypes } from "@/components/workflow-nodes";
+import TopbarNavigation from "@/components/topbar-navigation";
 import type { WorkflowGraph, WorkflowNodeData } from "@/lib/workflow";
 
 const defaultData: Record<string, WorkflowNodeData> = {
@@ -66,6 +67,7 @@ function Editor({ workflowId }: Props) {
 
   const input = "mt-1 w-full rounded-lg border border-slate-700 bg-slate-950 px-3 py-2 text-sm text-slate-100 outline-none focus:border-cyan-500";
   return <main className="flex h-screen flex-col overflow-hidden bg-slate-950 text-slate-100">
+    <TopbarNavigation />
     <header className="flex flex-wrap items-center gap-3 border-b border-slate-800 bg-slate-900 px-4 py-3"><a href="/workflows" aria-label="Quay lại" className="rounded-lg p-2 text-slate-400 hover:bg-slate-800"><ArrowLeft className="h-4 w-4" /></a><input className="max-w-xs rounded-lg border border-slate-700 bg-slate-950 px-3 py-2 text-sm font-semibold" value={name} onChange={(e) => setName(e.target.value)} aria-label="Tên workflow"/><div className="ml-auto flex items-center gap-3">{notice && <span className="text-xs text-cyan-300">{notice}</span>}<button onClick={save} disabled={busy === "save" || busy === "load"} className="inline-flex items-center gap-2 rounded-lg bg-cyan-500 px-4 py-2 text-sm font-semibold text-slate-950 disabled:opacity-50">{busy === "save" ? <LoaderCircle className="h-4 w-4 animate-spin" /> : <Save className="h-4 w-4" />}Lưu workflow</button></div></header>
     <div className="flex min-h-0 flex-1">
       <aside className="w-16 shrink-0 border-r border-slate-800 bg-slate-900 p-2 md:w-48"><p className="hidden px-2 py-2 text-xs font-semibold uppercase tracking-wider text-slate-500 md:block">Thêm node</p>{Object.entries(nodeMeta).map(([type, meta]) => { const Icon = meta.icon; return <button key={type} onClick={() => addNode(type)} title={meta.label} className="mb-1 flex w-full items-center justify-center gap-2 rounded-lg p-2 text-sm text-slate-300 hover:bg-slate-800 md:justify-start"><Icon className="h-4 w-4 shrink-0"/><span className="hidden md:inline">{meta.label}</span></button>; })}</aside>

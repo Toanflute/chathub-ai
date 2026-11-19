@@ -2,11 +2,13 @@
 
 import { FormEvent, useEffect, useState } from "react";
 import { AlertCircle, Check, ChevronDown, ChevronUp, Globe, KeyRound, LoaderCircle, Plus, RefreshCw, Trash2 } from "lucide-react";
+import TopbarNavigation from "@/components/topbar-navigation";
+import { useSettings } from "@/context/SettingsContext";
 
 type Group = { id: string; name: string; description: string | null; _count?: { documents: number } };
 type PreviewPage = { url: string; title: string; text: string; chunks: string[] };
 type Preview = { pages: PreviewPage[]; errors: { url: string; error: string }[]; stats: { pagesFound: number; failedPages: number; chunks: number; truncated: boolean } };
-type Settings = { provider: string; baseUrl?: string | null; modelName: string; embeddingModel: string; isEnabled: boolean; hasApiKey: boolean; apiKeyPreview?: string };
+type Settings = { provider: string; baseUrl?: string | null; modelName: string; embeddingModel: string; isEnabled: boolean; hasApiKey: boolean };
 
 async function responseJson(response: Response) {
   const data = await response.json();
@@ -15,6 +17,8 @@ async function responseJson(response: Response) {
 }
 
 export default function KnowledgeManager() {
+  const { settings: globalSettings, updateSettings } = useSettings();
+  const systemName = String(globalSettings.general?.systemName ?? "ChatHub");
   const [groups, setGroups] = useState<Group[]>([]);
   const [settings, setSettings] = useState<Settings>({ provider: "openai", modelName: "gpt-4o-mini", embeddingModel: "text-embedding-3-small", isEnabled: false, hasApiKey: false });
   const [apiKey, setApiKey] = useState("");
@@ -30,7 +34,7 @@ export default function KnowledgeManager() {
   async function load() {
     const [groupData, settingsData] = await Promise.all([fetch("/api/knowledge/groups").then(responseJson), fetch("/api/settings").then(responseJson)]);
     setGroups(groupData.groups);
-    if (settingsData.settings) setSettings(settingsData.settings);
+    if (settingsData.aiSettings) setSettings(settingsData.aiSettings);
     setGroupId((current) => current || groupData.groups[0]?.id || "");
   }
   useEffect(() => { load().catch((error) => setNotice({ type: "error", text: error.message })); }, []);
@@ -39,7 +43,8 @@ export default function KnowledgeManager() {
     event.preventDefault(); setBusy("settings"); setNotice(null);
     try {
       const data = await fetch("/api/settings", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ ...settings, apiKey, testConnection: true }) }).then(responseJson);
-      setSettings((current) => ({ ...current, ...data.settings })); setApiKey(""); setNotice({ type: "success", text: "Đã kiểm tra kết nối và lưu cấu hình AI." });
+      const saved = data.aiSettings ?? settings;
+      setSettings((current) => ({ ...current, ...saved })); updateSettings("ai-provider", saved); setApiKey(""); setNotice({ type: "success", text: "Đã kiểm tra kết nối và lưu cấu hình AI." });
     } catch (error) { setNotice({ type: "error", text: error instanceof Error ? error.message : "Không thể lưu cấu hình." }); }
     finally { setBusy(null); }
   }
@@ -71,8 +76,9 @@ export default function KnowledgeManager() {
   const buttonClass = "inline-flex items-center justify-center gap-2 rounded-xl bg-cyan-500 px-4 py-2.5 text-sm font-semibold text-slate-950 transition hover:bg-cyan-400 disabled:cursor-not-allowed disabled:opacity-50";
   return (
     <main className="min-h-screen bg-slate-950 px-4 py-8 text-slate-100 sm:px-8">
+      <TopbarNavigation />
       <div className="mx-auto max-w-6xl">
-        <a href="/" className="text-sm font-semibold text-cyan-400">← ChatHub AI</a>
+        <a href="/" className="text-sm font-semibold text-cyan-400">← {systemName}</a>
         <header className="mt-5"><p className="text-xs font-semibold uppercase tracking-[0.22em] text-cyan-400">Knowledge base</p><h1 className="mt-2 text-3xl font-bold">Quản lý kiến thức</h1><p className="mt-2 text-slate-400">Cấu hình AI, nhóm tài liệu và quét nội dung website để chuẩn bị cho RAG.</p></header>
         {notice && <div role="status" className={`mt-6 flex items-start gap-2 rounded-xl border p-3 text-sm ${notice.type === "error" ? "border-rose-900 bg-rose-950/50 text-rose-200" : "border-emerald-900 bg-emerald-950/40 text-emerald-200"}`}>{notice.type === "error" ? <AlertCircle className="mt-0.5 h-4 w-4 shrink-0" /> : <Check className="mt-0.5 h-4 w-4 shrink-0" />}{notice.text}</div>}
         <div className="mt-7 grid gap-6 lg:grid-cols-[0.9fr_1.1fr]">
@@ -81,7 +87,7 @@ export default function KnowledgeManager() {
             <form onSubmit={saveSettings} className="mt-5 space-y-4">
               <label className="block text-sm">Provider<select className={inputClass} value={settings.provider} onChange={(e) => setSettings({ ...settings, provider: e.target.value })}><option value="openai">OpenAI</option><option value="deepseek">DeepSeek</option><option value="custom">Custom OpenAI-compatible</option></select></label>
               {settings.provider === "custom" && <label className="block text-sm">Base URL<input className={inputClass} placeholder="https://api.example.com/v1" value={settings.baseUrl || ""} onChange={(e) => setSettings({ ...settings, baseUrl: e.target.value })} /></label>}
-              <label className="block text-sm">API Key<input className={inputClass} type="password" autoComplete="new-password" placeholder={settings.apiKeyPreview || "Nhập API key"} value={apiKey} onChange={(e) => setApiKey(e.target.value)} /></label>
+              <label className="block text-sm">API Key<input className={inputClass} type="password" autoComplete="new-password" placeholder={settings.hasApiKey ? "Đã lưu · nhập khoá mới để thay đổi" : "Nhập API key"} value={apiKey} onChange={(e) => setApiKey(e.target.value)} /></label>
               <label className="block text-sm">Chat model<input className={inputClass} value={settings.modelName} onChange={(e) => setSettings({ ...settings, modelName: e.target.value })} /></label>
               <label className="block text-sm">Embedding model<input className={inputClass} value={settings.embeddingModel} onChange={(e) => setSettings({ ...settings, embeddingModel: e.target.value })} /><span className="mt-1 block text-xs text-slate-500">Schema hiện tại yêu cầu vector 1536 chiều.</span></label>
               <label className="flex items-center gap-2 text-sm"><input type="checkbox" checked={settings.isEnabled} onChange={(e) => setSettings({ ...settings, isEnabled: e.target.checked })} className="accent-cyan-500" />Bật tính năng AI</label>

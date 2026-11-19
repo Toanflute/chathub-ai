@@ -1,0 +1,18 @@
+[
+  {
+    "id": "local-71476b31-5030-4cf4-8171-9fa538ee7d4f",
+    "code": "ch-facebook-01",
+    "name": "fb",
+    "platform": "facebook",
+    "status": "needs_config",
+    "enabled": true,
+    "groupSync": false,
+    "groups": [],
+    "externalAccountId": null,
+    "connectedAt": null,
+    "lastError": null,
+    "createdAt": "2026-11-19T10:44:27.967Z",
+    "updatedAt": "2026-11-19T10:44:27.967Z",
+    "authMode": "manual"
+  }
+]

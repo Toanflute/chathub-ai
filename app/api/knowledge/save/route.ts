@@ -2,6 +2,7 @@ import { NextResponse } from "next/server";
 import OpenAI from "openai";
 import { prisma } from "@/lib/prisma";
 import { chunkText } from "@/lib/crawler";
+import { getAiRuntimeSettings } from "@/lib/ai-settings";
 
 export const runtime = "nodejs";
 export const maxDuration = 60;
@@ -24,8 +25,8 @@ export async function POST(request: Request) {
     });
     if (pages.reduce((total, page) => total + page.text.length, 0) > 500_000) return NextResponse.json({ error: "Tổng nội dung vượt quá 500.000 ký tự mỗi lần lưu." }, { status: 413 });
 
-    const settings = await prisma.aiSettings.findFirst({ orderBy: { updatedAt: "desc" } });
-    if (!settings?.apiKey) return NextResponse.json({ error: "Hãy cấu hình AI Provider trước khi tạo embeddings." }, { status: 400 });
+    const settings = await getAiRuntimeSettings();
+    if (!settings.apiKey) return NextResponse.json({ error: "Hãy cấu hình AI Provider trước khi tạo embeddings." }, { status: 400 });
     const baseURL = settings.baseUrl?.trim() || (settings.provider === "deepseek" ? "https://api.deepseek.com" : undefined);
     const client = new OpenAI({ apiKey: settings.apiKey, ...(baseURL ? { baseURL } : {}), timeout: 30_000, maxRetries: 1 });
     const records = pages.map((page) => ({ ...page, chunks: chunkText(page.text) }));

@@ -1,6 +1,7 @@
 generator client {
   provider        = "prisma-client-js"
   previewFeatures = ["postgresqlExtensions"]
+  binaryTargets   = ["native", "darwin", "darwin-arm64", "windows", "debian-openssl-3.0.x"]
 }
 
 datasource db {
@@ -10,17 +11,26 @@ datasource db {
 }
 
 model AiSettings {
-  id            String   @id @default(cuid())
-  provider      String   @default("openai") // openai, deepseek, custom
-  baseUrl       String?
-  apiKey        String   // Store encrypted in production; never expose through client APIs.
-  modelName     String   @default("gpt-4o-mini")
-  embeddingModel String  @default("text-embedding-3-small")
-  isEnabled     Boolean  @default(false)
-  createdAt     DateTime @default(now())
-  updatedAt     DateTime @updatedAt
+  id             String   @id @default(cuid())
+  provider       String   @default("openai") // openai, deepseek, custom
+  baseUrl        String?
+  apiKey         String // Store encrypted in production; never expose through client APIs.
+  modelName      String   @default("gpt-4o-mini")
+  embeddingModel String   @default("text-embedding-3-small")
+  isEnabled      Boolean  @default(false)
+  createdAt      DateTime @default(now())
+  updatedAt      DateTime @updatedAt
 
   @@map("ai_settings")
+}
+
+model SystemSetting {
+  key             String   @id
+  value           Json?
+  secretEncrypted String?  @db.Text
+  updatedAt       DateTime @updatedAt
+
+  @@map("system_settings")
 }
 
 model KnowledgeGroup {
@@ -37,18 +47,18 @@ model KnowledgeGroup {
 }
 
 model Document {
-  id              String         @id @default(cuid())
-  title           String
-  sourceUrl       String?
-  sourceType      String         @default("website") // website, file, manual
-  status          String         @default("active") // active, inactive, processing, failed
-  content         String         @db.Text
-  metadata        Json?
+  id               String          @id @default(cuid())
+  title            String
+  sourceUrl        String?
+  sourceType       String          @default("website") // website, file, manual
+  status           String          @default("active") // active, inactive, processing, failed
+  content          String          @db.Text
+  metadata         Json?
   knowledgeGroupId String
-  knowledgeGroup  KnowledgeGroup @relation(fields: [knowledgeGroupId], references: [id], onDelete: Cascade)
-  chunks          DocumentChunk[]
-  createdAt       DateTime       @default(now())
-  updatedAt       DateTime       @updatedAt
+  knowledgeGroup   KnowledgeGroup  @relation(fields: [knowledgeGroupId], references: [id], onDelete: Cascade)
+  chunks           DocumentChunk[]
+  createdAt        DateTime        @default(now())
+  updatedAt        DateTime        @updatedAt
 
   @@index([knowledgeGroupId])
   @@index([status])
@@ -57,16 +67,16 @@ model Document {
 }
 
 model DocumentChunk {
-  id         String   @id @default(cuid())
+  id         String                       @id @default(cuid())
   documentId String
-  document   Document @relation(fields: [documentId], references: [id], onDelete: Cascade)
-  content    String   @db.Text
+  document   Document                     @relation(fields: [documentId], references: [id], onDelete: Cascade)
+  content    String                       @db.Text
   chunkIndex Int
   // PostgreSQL pgvector column. Prisma treats this as an unsupported native type;
   // vector similarity queries should use parameterized $queryRaw/$executeRaw SQL.
   embedding  Unsupported("vector(1536)")?
   metadata   Json?
-  createdAt  DateTime @default(now())
+  createdAt  DateTime                     @default(now())
 
   @@unique([documentId, chunkIndex])
   @@index([documentId])
@@ -87,30 +97,150 @@ model Workflow {
   @@map("workflows")
 }
 
+model Contact {
+  id            String         @id @default(cuid())
+  name          String
+  initials      String
+  avatar        String         @default("bg-slate-100 text-slate-700")
+  email         String?
+  phone         String?
+  orderNumber   String?
+  channel       String         @default("Chat Plugin")
+  balance       Decimal        @default(0) @db.Decimal(12, 2)
+  address       String         @default("")
+  connected     Boolean        @default(true)
+  tag           String         @default("Khách hàng")
+  assignee      String         @default("Chưa gán")
+  activity      Int            @default(0)
+  notes         String[]       @default([])
+  createdAt     DateTime       @default(now())
+  updatedAt     DateTime       @updatedAt
+  conversations Conversation[]
+  orders        Order[]
+  appointments  Appointment[]
+
+  @@index([name])
+  @@index([channel])
+  @@index([createdAt])
+  @@map("contacts")
+}
+
 model Conversation {
-  id          String    @id @default(cuid())
-  visitorId   String?
-  channel     String    @default("WEB_CHAT")
-  status      String    @default("open") // open, resolved, handed_off
-  metadata    Json?
-  messages    Message[]
-  createdAt   DateTime  @default(now())
-  updatedAt   DateTime  @updatedAt
+  id                  String             @id @default(cuid())
+  visitorId           String?
+  channel             String             @default("WEB_CHAT")
+  status              String             @default("open") // open, resolved, handed_off
+  contactId           String?
+  contact             Contact?           @relation(fields: [contactId], references: [id], onDelete: SetNull)
+  channelConnectionId String?
+  channelConnection   ChannelConnection?  @relation(fields: [channelConnectionId], references: [id], onDelete: SetNull)
+  assignee            String?
+  lastReadAt          DateTime?
+  archivedAt          DateTime?
+  metadata            Json?
+  messages            Message[]
+  createdAt           DateTime           @default(now())
+  updatedAt           DateTime           @updatedAt
 
   @@index([visitorId])
   @@index([status, updatedAt])
+  @@index([channelConnectionId])
   @@map("conversations")
+}
+
+model ChannelConnection {
+  id             String         @id @default(cuid())
+  code           String         @unique
+  name           String
+  platform       String
+  status         String         @default("needs_config")
+  enabled        Boolean        @default(true)
+  groupSync      Boolean        @default(false)
+  groups         String[]       @default([])
+  credentialsEncrypted String?  @db.Text
+  externalAccountId String?
+  connectedAt    DateTime?
+  lastError      String?        @db.Text
+  createdAt      DateTime       @default(now())
+  updatedAt      DateTime       @updatedAt
+  conversations  Conversation[]
+
+  @@index([platform])
+  @@index([status, enabled])
+  @@map("channel_connections")
 }
 
 model Message {
   id             String       @id @default(cuid())
   conversationId String
   conversation   Conversation @relation(fields: [conversationId], references: [id], onDelete: Cascade)
-  role           String       // user, assistant, system
+  role           String // user, agent, assistant, note, system
   content        String       @db.Text
   metadata       Json?
   createdAt      DateTime     @default(now())
 
   @@index([conversationId, createdAt])
   @@map("messages")
+}
+
+model Order {
+  id             String   @id @default(cuid())
+  code           String   @unique
+  productName    String
+  quantity       Int      @default(1)
+  category       String
+  workflow       String   @default("Workflow bán tự động")
+  total          Decimal  @db.Decimal(14, 2)
+  currency       String   @default("Credits")
+  status         String   @default("pending")
+  placedAt       DateTime
+  note           String   @default("") @db.Text
+  processingCode String
+  deliveryType   String   @default("Nội dung dùng chung")
+  contactId      String?
+  contact        Contact? @relation(fields: [contactId], references: [id], onDelete: SetNull)
+  createdAt      DateTime @default(now())
+  updatedAt      DateTime @updatedAt
+
+  @@index([status, placedAt])
+  @@index([contactId])
+  @@map("orders")
+}
+
+model Appointment {
+  id              String   @id @default(cuid())
+  customerId      String?
+  customer        Contact? @relation(fields: [customerId], references: [id], onDelete: SetNull)
+  serviceName     String
+  startsAt        DateTime
+  endsAt          DateTime
+  durationMinutes Int      @default(60)
+  assignedTo      String   @default("Ai cũng được")
+  status          String   @default("pending")
+  note            String   @default("") @db.Text
+  createdAt       DateTime @default(now())
+  updatedAt       DateTime @updatedAt
+
+  @@index([startsAt, assignedTo])
+  @@index([customerId])
+  @@map("appointments")
+}
+
+model Notification {
+  id        String   @id @default(cuid())
+  channel   String
+  title     String   @default("Kênh mất kết nối")
+  message   String   @db.Text
+  isRead    Boolean  @default(false)
+  createdAt DateTime @default(now())
+
+  @@index([isRead, createdAt])
+  @@map("notifications")
+}
+
+model AppState {
+  key       String   @id
+  createdAt DateTime @default(now())
+
+  @@map("app_state")
 }
