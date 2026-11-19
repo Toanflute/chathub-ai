@@ -1,1 +1,0 @@
-{"version":1,"functions":{"/api/crawler":{"maxDuration":60},"/api/knowledge/groups":{},"/api/settings":{},"/api/workflows/[id]":{},"/api/workflows":{},"/knowledge":{},"/workflows/[id]":{},"/workflows":{},"/api/chat":{"maxDuration":60},"/api/knowledge/save":{"maxDuration":60},"/api/workflows/copilot":{"maxDuration":45}}}

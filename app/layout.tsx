@@ -1,7 +1,7 @@
 import type { Metadata } from "next";
 import "@xyflow/react/dist/style.css";
+import MoreMenu from "@/components/more-menu";
 import "./globals.css";
-import { SettingsProvider } from "@/context/SettingsContext";
 
 export const metadata: Metadata = {
   title: "ChatHub AI",
@@ -11,9 +11,7 @@ export const metadata: Metadata = {
 export default function RootLayout({ children }: Readonly<{ children: React.ReactNode }>) {
   return (
     <html lang="vi">
-      <body>
-        <SettingsProvider>{children}</SettingsProvider>
-      </body>
+      <body>{children}<MoreMenu /></body>
     </html>
   );
 }

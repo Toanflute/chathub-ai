@@ -1,50 +1,24 @@
-import { NextResponse } from "next/server";
-import type { NextRequest } from "next/server";
-
-const protectedRoutes = [
-  "/inbox",
-  "/knowledge",
-  "/workflows",
-  "/contacts",
-  "/products",
-  "/orders",
-  "/appointments",
-  "/quick-replies",
-  "/campaigns",
-  "/channels",
-  "/team",
-  "/reports",
-  "/activity",
-  "/settings",
-];
+import { NextRequest, NextResponse } from "next/server";
 
 export function middleware(request: NextRequest) {
-  const isAuthenticated = request.cookies.get("chathub-auth")?.value === "true";
+  const isLoggedIn = request.cookies.get("chathub_demo_session")?.value === "authenticated";
   const { pathname } = request.nextUrl;
-  const needsAuth =
-    pathname === "/" ||
-    protectedRoutes.some((route) => pathname === route || pathname.startsWith(`${route}/`));
 
-  if (needsAuth && !isAuthenticated) {
-    const loginUrl = request.nextUrl.clone();
-    loginUrl.pathname = "/login";
-    loginUrl.search = "";
+  if (pathname === "/login") {
+    if (isLoggedIn) return NextResponse.redirect(new URL("/dashboard", request.url));
+    return NextResponse.next();
+  }
+
+  if (!isLoggedIn) {
+    const loginUrl = new URL("/login", request.url);
+    if (pathname !== "/") loginUrl.searchParams.set("from", pathname);
     return NextResponse.redirect(loginUrl);
   }
 
-  if (pathname === "/" && isAuthenticated) {
-    const inboxUrl = request.nextUrl.clone();
-    inboxUrl.pathname = "/inbox";
-    inboxUrl.search = "";
-    return NextResponse.redirect(inboxUrl);
-  }
-
-  if (pathname === "/login" && isAuthenticated) {
-    const inboxUrl = request.nextUrl.clone();
-    inboxUrl.pathname = "/inbox";
-    inboxUrl.search = "";
-    return NextResponse.redirect(inboxUrl);
-  }
-
+  if (pathname === "/") return NextResponse.redirect(new URL("/dashboard", request.url));
   return NextResponse.next();
 }
+
+export const config = {
+  matcher: ["/", "/login", "/dashboard/:path*", "/knowledge/:path*", "/workflows/:path*"],
+};
