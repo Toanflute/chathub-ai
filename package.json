@@ -1,6 +1,6 @@
 {
   "name": "chathub-ai",
-  "version": "0.1.0",
+  "version": "0.1.1",
   "description": "ChatHub AI multi-channel customer support desktop app",
   "author": {
     "name": "ChatHub AI",
@@ -67,9 +67,11 @@
       "app/**/*",
       "components/**/*",
       "context/**/*",
+      "data/**/*",
       "lib/**/*",
       "prisma/**/*",
       "public/**/*",
+      "middleware.ts",
       "next.config.mjs",
       "package.json",
       "!**/*.tsbuildinfo"
