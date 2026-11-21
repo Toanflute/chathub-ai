@@ -76,3 +76,4 @@ Desktop login windows use a persistent Electron session partition per channel. T
 - `npm run build` — generate Prisma Client and build the app
 - `npm run db:migrate` — create/apply a development migration
 - `npm run db:studio` — open Prisma Studio
+- `npm run sync:github` - lệnh cập nhật
