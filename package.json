@@ -12,6 +12,7 @@
     "dev": "next dev",
     "build": "prisma generate && next build",
     "start": "next start",
+    "sync:github": "git status -s && git add -A && git diff-index --quiet HEAD || git commit -m \"Update latest UI and data changes\" && git pull --rebase origin main && git push origin main",
     "electron:dev": "concurrently -k -s first \"npm:dev\" \"wait-on http://localhost:3000 && electron electron/main.cjs\"",
     "electron:build:mac": "npm run build && electron-builder --mac --publish never",
     "electron:build:win": "npm run build && electron-builder --win --publish never",
